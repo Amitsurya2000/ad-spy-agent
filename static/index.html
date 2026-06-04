@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viral Ad Cloner</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0f;--surface:#12121a;--s2:#1a1a26;--s3:#222233;--border:#2a2a3a;--text:#e4e4ef;--dim:#8888a0;--accent:#6c5ce7;--a2:#a29bfe;--green:#00b894;--red:#e17055;--orange:#fdcb6e;--blue:#74b9ff;--pink:#fd79a8;--r:12px}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 40px;display:flex;align-items:center;justify-content:space-between}
+    .header h1{font-size:24px;font-weight:800;background:linear-gradient(135deg,#e84393,var(--accent),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .header .sub{color:var(--dim);font-size:12px;margin-top:2px}
+    .gemini-badge{background:linear-gradient(135deg,#4285f4,#34a853);color:#fff;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600}
+    .gemini-badge.off{background:var(--s2);color:var(--dim)}
+    .container{max-width:1440px;margin:0 auto;padding:24px 40px}
+
+    .tabs{display:flex;gap:2px;margin-bottom:24px;background:var(--surface);border-radius:10px;padding:4px;border:1px solid var(--border)}
+    .tab{padding:10px 18px;cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;border-radius:8px;transition:.2s}
+    .tab:hover{color:var(--text)}.tab.active{background:var(--accent);color:#fff}
+    .tab-content{display:none}.tab-content.active{display:block}
+
+    .search-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;margin-bottom:24px}
+    .search-panel h2{font-size:15px;margin-bottom:14px;color:var(--a2)}
+    .search-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+    .field{display:flex;flex-direction:column;gap:5px}
+    .field label{font-size:11px;color:var(--dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+    .field input,.field select,.field textarea{background:var(--s2);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:14px;outline:none;font-family:inherit;transition:border .2s}
+    .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+    .field textarea{min-height:60px;resize:vertical}
+
+    .btn{padding:9px 22px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;transition:.2s;display:inline-flex;align-items:center;gap:8px}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),#7c6cf0);color:#fff}
+    .btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(108,92,231,.4)}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-clone{background:linear-gradient(135deg,#e84393,#fd79a8);color:#fff}
+    .btn-clone:hover{box-shadow:0 4px 15px rgba(232,67,147,.4)}
+    .btn-secondary{background:var(--s2);color:var(--text);border:1px solid var(--border)}
+    .btn-ghost{background:none;color:var(--a2);border:1px solid var(--border);padding:6px 12px;font-size:12px;border-radius:6px;cursor:pointer}
+    .btn-ghost:hover{background:var(--s2)}
+
+    .status-bar{background:var(--s2);border-radius:8px;padding:12px 16px;margin-top:14px;display:none;align-items:center;gap:10px;font-size:14px}
+    .status-bar.visible{display:flex}
+    .spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+    .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px}
+    .stat-card .sl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+    .stat-card .sv{font-size:24px;font-weight:700;margin-top:4px}
+    .sv.accent{color:var(--a2)}.sv.green{color:var(--green)}.sv.orange{color:var(--orange)}.sv.blue{color:var(--blue)}.sv.pink{color:var(--pink)}
+
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px}
+    .card h3{font-size:14px;color:var(--a2);margin-bottom:12px;font-weight:600}
+    .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px}
+
+    .bar-chart{display:flex;flex-direction:column;gap:7px}
+    .bar-row{display:flex;align-items:center;gap:10px}
+    .bar-label{font-size:11px;width:120px;color:var(--dim);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bar-track{flex:1;height:20px;background:var(--s2);border-radius:5px;overflow:hidden}
+    .bar-fill{height:100%;border-radius:5px;transition:width .6s;display:flex;align-items:center;padding-left:7px;font-size:10px;font-weight:600;color:#fff;min-width:24px}
+    .bf-purple{background:linear-gradient(90deg,var(--accent),var(--a2))}
+    .bf-green{background:linear-gradient(90deg,#00b894,#55efc4)}
+    .bf-orange{background:linear-gradient(90deg,#e17055,#fdcb6e)}
+    .bf-blue{background:linear-gradient(90deg,#0984e3,#74b9ff)}
+    .bf-pink{background:linear-gradient(90deg,#e84393,#fd79a8)}
+
+    /* Ad cards with images */
+    .ad-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+    .ad-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;transition:.2s}
+    .ad-card:hover{border-color:var(--accent)}
+    .ad-img{width:100%;height:220px;background:var(--s2);display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;position:relative;overflow:hidden}
+    .ad-img img{width:100%;height:100%;object-fit:cover}
+    .ad-img .clone-overlay{position:absolute;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;opacity:0;transition:.3s}
+    .ad-card:hover .clone-overlay{opacity:1}
+    .ad-body{padding:16px}
+    .ad-meta{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+    .tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+    .t-active{background:rgba(0,184,148,.15);color:var(--green)}
+    .t-inactive{background:rgba(225,112,85,.15);color:var(--red)}
+    .t-conv{background:rgba(108,92,231,.15);color:var(--a2)}
+    .t-aware{background:rgba(116,185,255,.15);color:var(--blue)}
+    .t-consider{background:rgba(253,203,110,.15);color:var(--orange)}
+    .t-cta{background:rgba(253,121,168,.15);color:var(--pink)}
+    .t-angle{background:rgba(108,92,231,.1);color:var(--a2);border:1px solid rgba(108,92,231,.2)}
+    .ad-id{font-size:10px;color:var(--dim);font-family:monospace;margin-bottom:4px}
+    .ad-copy{font-size:13px;line-height:1.5;margin-bottom:8px;max-height:70px;overflow:hidden}
+    .ad-headline{font-size:13px;font-weight:600;color:var(--a2);margin-bottom:4px}
+    .ad-details{font-size:11px;color:var(--dim)}
+
+    /* Image analysis card */
+    .img-analysis{background:var(--s2);border-radius:8px;padding:12px;margin-top:10px;font-size:12px;display:none}
+    .img-analysis.open{display:block}
+    .img-analysis .ia-row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)}
+    .ia-label{color:var(--dim)}.ia-value{color:var(--text);font-weight:500;text-align:right;max-width:60%}
+
+    /* DNA highlights */
+    .dna-hl{background:linear-gradient(135deg,rgba(108,92,231,.08),rgba(162,155,254,.08));border:1px solid rgba(108,92,231,.2);border-radius:var(--r);padding:16px;margin-bottom:14px}
+    .dna-hl .big{font-size:18px;font-weight:700;color:var(--a2)}
+    .dna-hl .desc{font-size:11px;color:var(--dim);margin-top:3px}
+    .dna-text{font-size:13px;line-height:1.7;color:var(--text);padding:12px;background:var(--s2);border-radius:8px;margin-bottom:12px;border-left:3px solid var(--accent)}
+    .dna-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .dna-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+    .dna-item .dl{color:var(--dim)}.dna-item .dv{font-weight:600;text-align:right;max-width:55%}
+
+    /* Rewrite/Clone cards */
+    .rw-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px;transition:.2s}
+    .rw-card:hover{border-color:var(--accent)}
+    .rw-card .ver{font-size:11px;font-weight:700;color:var(--pink);text-transform:uppercase;margin-bottom:6px}
+    .rw-card .rw-text{font-size:14px;line-height:1.7;white-space:pre-line;margin-bottom:10px}
+    .rw-card .rw-headline{font-size:15px;font-weight:700;color:var(--a2);margin-bottom:8px}
+    .rw-card .rw-meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .rw-card .img-brief{background:var(--surface);border-radius:8px;padding:12px;margin-top:10px;font-size:12px;color:var(--dim);border-left:3px solid var(--pink)}
+    .rw-card .img-brief strong{color:var(--pink)}
+    .rw-card .why{font-size:11px;color:var(--dim);margin-top:8px;font-style:italic}
+    .copy-btn{margin-left:auto;background:none;border:1px solid var(--border);color:var(--dim);padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer}
+    .copy-btn:hover{color:var(--accent);border-color:var(--accent)}
+
+    /* Clone modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100;display:none}
+    .modal-bg.open{display:flex}
+    .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto}
+    .modal h2{font-size:18px;margin-bottom:16px;color:var(--a2)}
+    .modal .close{position:absolute;top:16px;right:20px;font-size:24px;cursor:pointer;color:var(--dim)}
+
+    .empty{text-align:center;padding:60px 20px;color:var(--dim)}
+    .empty h3{font-size:18px;color:var(--text);margin-bottom:8px}
+    .hidden{display:none!important}
+    @media(max-width:768px){.container{padding:16px}.search-row,.dna-grid,.rewrite-form{flex-direction:column}.ad-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div><h1>Viral Ad Cloner</h1><div class="sub">Extract DNA. Clone Winners. Powered by Gemini AI.</div></div>
+  <span class="gemini-badge" id="geminiBadge">Checking...</span>
+</div>
+
+<div class="container">
+  <div class="search-panel">
+    <h2>Start Research</h2>
+    <div class="search-row">
+      <div class="field" style="flex:2"><label>Brand / Keyword</label><input type="text" id="q" placeholder="Nike, Sneh Desai, Coaching..."/></div>
+      <div class="field"><label>Country</label><select id="country"><option value="ALL">All</option><option value="US">US</option><option value="GB">UK</option><option value="IN">India</option><option value="CA">Canada</option><option value="AU">Australia</option><option value="DE">Germany</option><option value="BR">Brazil</option></select></div>
+      <div class="field"><label>Max Ads</label><select id="maxAds"><option>10</option><option>20</option><option selected>30</option><option>50</option></select></div>
+      <button class="btn btn-primary" id="goBtn" onclick="go()">Extract DNA</button>
+    </div>
+    <div class="status-bar" id="sbar"><div class="spinner"></div><span id="stxt">Starting...</span></div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="tabs" id="tabBar">
+      <div class="tab active" onclick="stab('overview')">Overview</div>
+      <div class="tab" onclick="stab('ads')">Ads & Creatives</div>
+      <div class="tab" onclick="stab('dna')">Copy DNA</div>
+      <div class="tab" onclick="stab('creative')">Creative DNA</div>
+      <div class="tab" onclick="stab('clone')">Clone & Rewrite</div>
+    </div>
+
+    <div class="tab-content active" id="t-overview"><div id="statsG"></div><div class="charts-row" id="chartsR"></div>
+      <div style="display:flex;gap:8px"><button class="btn btn-secondary" onclick="dl('json')">JSON</button><button class="btn btn-secondary" onclick="dl('csv')">CSV</button></div>
+    </div>
+
+    <div class="tab-content" id="t-ads"><div class="ad-grid" id="adG"></div></div>
+
+    <div class="tab-content" id="t-dna"><div id="dnaC"></div></div>
+
+    <div class="tab-content" id="t-creative"><div id="crC"></div></div>
+
+    <div class="tab-content" id="t-clone">
+      <div class="card">
+        <h3>Clone Competitor DNA Into Your Ads</h3>
+        <p style="color:var(--dim);font-size:13px;margin-bottom:16px">Gemini AI will rewrite ads following the EXACT copy DNA, psychological triggers, angles, and creative patterns. Each clone includes an image brief for your designer.</p>
+        <div class="search-row" style="margin-bottom:14px">
+          <div class="field" style="flex:1"><label>Your Product</label><input id="rwP" placeholder="e.g. FitPro Shoes"/></div>
+          <div class="field" style="flex:1"><label>Description</label><input id="rwD" placeholder="e.g. premium running shoes"/></div>
+          <div class="field" style="flex:1"><label>Target Audience</label><input id="rwA" placeholder="e.g. fitness enthusiasts 25-40"/></div>
+          <button class="btn btn-clone" onclick="rewrite()">Generate Clones</button>
+        </div>
+      </div>
+      <div id="rwR"></div>
+
+      <!-- Niche Transformation -->
+      <div class="card" style="margin-top:20px">
+        <h3>Niche Transformation</h3>
+        <p style="color:var(--dim);font-size:13px;margin-bottom:16px">Take the winning DNA and transform it into a COMPLETELY different niche. Same psychology, different industry.</p>
+        <div class="search-row" style="margin-bottom:14px">
+          <div class="field" style="flex:1"><label>Target Niche</label><input id="ntNiche" placeholder="e.g. Real Estate, Fitness, SaaS"/></div>
+          <div class="field" style="flex:1"><label>Product Name</label><input id="ntProduct" placeholder="e.g. DreamHome Realty"/></div>
+          <div class="field" style="flex:1"><label>Product Description</label><input id="ntDesc" placeholder="e.g. luxury apartment listings"/></div>
+          <button class="btn btn-primary" onclick="nicheTransform()">Transform Niche</button>
+        </div>
+      </div>
+      <div id="ntR"></div>
+    </div>
+  </div>
+
+  <div id="empty" class="empty"><h3>No Research Yet</h3><p>Enter a brand to extract their ad DNA.</p></div>
+</div>
+
+<!-- Clone modal -->
+<div class="modal-bg" id="cloneModal">
+  <div class="modal"><h2>Clone This Ad</h2>
+    <div id="cloneBody">Loading...</div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="document.getElementById('cloneModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let jobId=null,D=null,geminiOn=false;
+
+fetch('/api/status').then(r=>r.json()).then(d=>{
+  geminiOn=d.gemini_enabled;
+  const b=document.getElementById('geminiBadge');
+  b.textContent=geminiOn?'Gemini AI Enabled':'Gemini Off';
+  b.className='gemini-badge'+(geminiOn?'':' off');
+});
+
+function stab(n){
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.classList.toggle('active',t.textContent.toLowerCase().replace(/[& ]/g,'').includes(n.slice(0,4)));
+  });
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('t-'+n).classList.add('active');
+}
+
+async function go(){
+  const q=document.getElementById('q').value.trim();if(!q)return;
+  document.getElementById('goBtn').disabled=true;
+  document.getElementById('sbar').classList.add('visible');
+  document.getElementById('stxt').textContent='Launching browser...';
+  document.getElementById('empty').classList.add('hidden');
+  document.getElementById('results').classList.add('hidden');
+  try{
+    const r=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,country:document.getElementById('country').value,max_ads:parseInt(document.getElementById('maxAds').value),scroll_rounds:5})});
+    const d=await r.json();if(d.error){document.getElementById('stxt').textContent='Error: '+d.error;document.getElementById('goBtn').disabled=false;return;}
+    jobId=d.job_id;poll();
+  }catch(e){document.getElementById('stxt').textContent='Error: '+e.message;document.getElementById('goBtn').disabled=false;}
+}
+
+function poll(){
+  const st=document.getElementById('stxt');
+  const steps=['Opening Ad Library...','Identifying brand...','Scrolling & loading ads...','Extracting images...','Parsing ad cards...','Analyzing copy & angles...','Running Gemini AI analysis...','Building DNA reports...'];
+  let s=0;
+  const iv=setInterval(async()=>{
+    s=Math.min(s+1,steps.length-1);st.textContent=steps[s];
+    try{
+      const r=await fetch('/api/research/'+jobId);const d=await r.json();
+      if(d.status==='completed'){clearInterval(iv);D=d;renderAll();document.getElementById('sbar').classList.remove('visible');document.getElementById('goBtn').disabled=false;}
+      else if(d.status==='failed'){clearInterval(iv);st.textContent='Failed: '+(d.error||'Unknown');document.getElementById('goBtn').disabled=false;}
+    }catch(e){}
+  },3000);
+}
+
+function renderAll(){
+  document.getElementById('results').classList.remove('hidden');
+  try{renderOverview();}catch(e){console.error('renderOverview error:',e);}
+  try{renderAds();}catch(e){console.error('renderAds error:',e);}
+  try{renderDNA();}catch(e){console.error('renderDNA error:',e);}
+  try{renderCreative();}catch(e){console.error('renderCreative error:',e);}
+}
+function s(v){if(v===null||v===undefined)return'N/A';if(typeof v==='object')return JSON.stringify(v);return String(v);}
+
+function renderOverview(){
+  const b=D.brand_info,a=D.ads,cd=D.gemini_copy_dna||D.copy_dna||{};
+  const active=a.filter(x=>x.status==='Active').length;
+  const imgs=a.filter(x=>x.image_file).length;
+  document.getElementById('statsG').innerHTML=`
+    <div class="stats-grid">
+      <div class="stat-card"><div class="sl">Brand</div><div class="sv accent">${b.matched_brand}</div></div>
+      <div class="stat-card"><div class="sl">Total in Library</div><div class="sv blue">${b.total_results}</div></div>
+      <div class="stat-card"><div class="sl">Scraped</div><div class="sv">${a.length}</div></div>
+      <div class="stat-card"><div class="sl">Active</div><div class="sv green">${active}</div></div>
+      <div class="stat-card"><div class="sl">Images</div><div class="sv pink">${imgs}</div></div>
+      <div class="stat-card"><div class="sl">AI Engine</div><div class="sv ${D.has_gemini?'green':'orange'}">${D.has_gemini?'Gemini':'Rules'}</div></div>
+    </div>`;
+  const angles=cf(a,'angle'),funnels=cf(a,'funnel_stage'),ctas=cf(a,'cta');
+  document.getElementById('chartsR').innerHTML=`
+    <div class="card"><h3>Angles</h3><div class="bar-chart">${bars(angles,a.length,'bf-purple')}</div></div>
+    <div class="card"><h3>Funnels</h3><div class="bar-chart">${bars(funnels,a.length,'bf-blue')}</div></div>
+    <div class="card"><h3>CTAs</h3><div class="bar-chart">${bars(ctas,a.length,'bf-green')}</div></div>`;
+}
+
+function renderAds(){
+  const g=document.getElementById('adG');g.innerHTML='';
+  D.ads.forEach((ad,i)=>{
+    const fb=ad.full_breakdown||{};
+    const cb=ad.copy_breakdown||{};
+    const ha=fb.hook_analysis||{};
+    const ps=fb.psychology_triggers||{};
+    const cd=fb.creative_dna||{};
+    const co=fb.copy_breakdown||{};
+    const vb=fb.visual_breakdown||{};
+    const ww=fb.why_this_ad_works||[];
+    const hasFB=Object.keys(fb).length>2;
+
+    const sc=ad.status==='Active'?'t-active':'t-inactive';
+    const fc='t-'+ad.funnel_stage.toLowerCase().slice(0,5);
+    const imgH=ad.image_file?`<img src="/api/images/${ad.image_file}" onerror="this.parentElement.innerHTML='No Image'"><div class="clone-overlay"><button class="btn btn-clone" onclick="event.stopPropagation();cloneAd(${i})">Clone This Ad</button></div>`:'No Image';
+
+    g.innerHTML+=`<div class="ad-card">
+      <div class="ad-img">${imgH}</div>
+      <div class="ad-body">
+        <div class="ad-id">ID: ${ad.ad_id} | ${ad.start_date}${fb.overall_score?' | Score: <strong style="color:var(--green)">'+fb.overall_score+'/10</strong>':''}</div>
+        <div class="ad-meta">
+          <span class="tag ${sc}">${ad.status}</span>
+          <span class="tag ${fc}">${ad.funnel_stage}</span>
+          <span class="tag t-cta">${ad.cta}</span>
+          <span class="tag t-angle">${ad.angle}</span>
+        </div>
+        ${fb.one_line_verdict?'<div style="font-size:12px;color:var(--green);margin-bottom:6px;font-style:italic">'+fb.one_line_verdict+'</div>':''}
+        <div class="ad-headline">${ad.headline||''}</div>
+        <div class="ad-copy">${ad.primary_text||'No copy'}</div>
+        <div class="ad-details">${ad.platform} | ${ad.media_type}${ad.price?' | '+ad.price:''}</div>
+
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${hasFB?'<button class="btn-ghost" onclick="toggleNext(this,1)">Hook & Psychology</button>':''}
+          ${hasFB?'<button class="btn-ghost" onclick="toggleNext(this,2)">Creative DNA</button>':''}
+          ${hasFB?'<button class="btn-ghost" onclick="toggleNext(this,3)">Visual & Why It Works</button>':''}
+          ${!hasFB?'<button class="btn-ghost" onclick="toggleNext(this,1)">Copy Breakdown</button>':''}
+        </div>
+
+        ${hasFB?`
+        <!-- Hook & Psychology -->
+        <div class="img-analysis">
+          <div style="font-weight:700;color:var(--a2);margin-bottom:8px">HOOK ANALYSIS</div>
+          <div class="ia-row"><span class="ia-label">First 3 Seconds</span><span class="ia-value">${ha.first_3_seconds||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Hook Type</span><span class="ia-value">${ha.hook_type||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Why It Works</span><span class="ia-value">${ha.why_it_works||'N/A'}</span></div>
+          <div style="font-weight:700;color:var(--pink);margin:12px 0 8px">PSYCHOLOGY & TRIGGERS</div>
+          <div class="ia-row"><span class="ia-label">Pain Points</span><span class="ia-value">${(ps.pain_points_targeted||[]).join(', ')||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Desires</span><span class="ia-value">${(ps.desire_triggered||[]).join(', ')||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Emotional Drivers</span><span class="ia-value">${(ps.emotional_drivers||[]).join(', ')||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Cognitive Biases</span><span class="ia-value">${(ps.cognitive_biases||[]).join(', ')||'N/A'}</span></div>
+          ${ps.persuasion_explanation?'<div style="margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5">'+ps.persuasion_explanation+'</div>':''}
+        </div>
+        <!-- Creative DNA -->
+        <div class="img-analysis">
+          <div style="font-weight:700;color:var(--a2);margin-bottom:8px">CREATIVE DNA (Replicable Formula)</div>
+          <div class="ia-row"><span class="ia-label">Hook Formula</span><span class="ia-value">${cd.hook_formula||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Body Structure</span><span class="ia-value">${cd.body_structure||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Offer Structure</span><span class="ia-value">${cd.offer_structure||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">CTA Strategy</span><span class="ia-value">${cd.cta_strategy||'N/A'}</span></div>
+          ${cd.replicable_pattern?'<div style="margin-top:8px;padding:8px;background:var(--surface);border-radius:6px;font-size:11px;color:var(--text);line-height:1.5;border-left:3px solid var(--accent)"><strong>Pattern:</strong> '+cd.replicable_pattern+'</div>':''}
+          <div style="font-weight:700;color:var(--pink);margin:12px 0 8px">COPY ANALYSIS</div>
+          <div class="ia-row"><span class="ia-label">Style</span><span class="ia-value">${co.primary_text_style||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Headline Strategy</span><span class="ia-value">${co.headline_strategy||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Tone</span><span class="ia-value">${co.tone||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Power Words</span><span class="ia-value">${(co.power_words||[]).join(', ')||'N/A'}</span></div>
+          ${co.copy_score?'<div class="ia-row"><span class="ia-label">Copy Score</span><span class="ia-value" style="color:var(--green)">'+co.copy_score+'/10</span></div>':''}
+        </div>
+        <!-- Visual & Why -->
+        <div class="img-analysis">
+          <div style="font-weight:700;color:var(--a2);margin-bottom:8px">VISUAL BREAKDOWN</div>
+          <div class="ia-row"><span class="ia-label">What Is Shown</span><span class="ia-value">${vb.what_is_shown||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Layout</span><span class="ia-value">${vb.layout_type||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Colors</span><span class="ia-value">${(vb.color_palette||[]).join(', ')||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Text Overlay</span><span class="ia-value">${vb.text_overlay_content||'None'}</span></div>
+          <div class="ia-row"><span class="ia-label">Person</span><span class="ia-value">${vb.person_description||'None'}</span></div>
+          <div class="ia-row"><span class="ia-label">Style</span><span class="ia-value">${vb.editing_style||'N/A'}</span></div>
+          ${vb.why_visuals_convert?'<div style="margin-top:8px;font-size:11px;color:var(--dim);line-height:1.5"><strong>Why visuals convert:</strong> '+vb.why_visuals_convert+'</div>':''}
+          ${ww.length?'<div style="font-weight:700;color:var(--green);margin:12px 0 8px">WHY THIS AD WORKS</div>'+ww.map((r,j)=>'<div style="padding:4px 0;font-size:12px;color:var(--text)">'+(j+1)+'. '+r+'</div>').join(''):''}
+        </div>
+        `:`
+        <!-- Fallback: rule-based copy breakdown -->
+        <div class="img-analysis">
+          <div class="ia-row"><span class="ia-label">Hook</span><span class="ia-value">${cb.hook||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Problem</span><span class="ia-value">${cb.problem||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Solution</span><span class="ia-value">${cb.solution||'N/A'}</span></div>
+          <div class="ia-row"><span class="ia-label">Offer</span><span class="ia-value">${cb.offer||'N/A'}</span></div>
+        </div>
+        `}
+      </div>
+    </div>`;
+  });
+}
+
+function toggleNext(btn,nth){
+  // Toggle the nth sibling .img-analysis after the button container
+  const container=btn.parentElement;
+  let el=container.nextElementSibling;
+  for(let i=1;i<nth;i++){if(el)el=el.nextElementSibling;}
+  if(el)el.classList.toggle('open');
+}
+
+function renderDNA(){
+  const gd=D.gemini_copy_dna||{};const rd=D.copy_dna||{};
+  const c=document.getElementById('dnaC');
+
+  // Handle both flat and nested structures from Gemini
+  const tone=gd.tone||{};const hs=gd.hook_strategy||{};const pp=gd.psychology_playbook||{};const cp=gd.copy_patterns||{};const cs=gd.cta_strategy||{};
+  const tonePrimary=typeof tone==='object'?tone.primary:gd.tone_primary;
+  const hookPattern=typeof hs==='object'?hs.pattern:gd.hook_strategy;
+  const hookExamples=typeof hs==='object'?(hs.hook_examples||[]):(gd.hook_examples||[]);
+  const persuasion=typeof pp==='object'?pp.persuasion_technique:gd.persuasion_technique;
+
+  if(gd.dna_summary){
+    c.innerHTML=`
+      <div class="dna-text">${gd.dna_summary}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="dna-hl"><div class="big">${gd.copy_framework||'N/A'}</div><div class="desc">Copy Framework</div></div>
+        <div class="dna-hl"><div class="big">${tonePrimary||gd.tone_primary||'N/A'}</div><div class="desc">Primary Tone</div></div>
+        <div class="dna-hl"><div class="big">${persuasion||gd.persuasion_technique||'N/A'}</div><div class="desc">Persuasion Technique</div></div>
+      </div>
+      <div class="dna-grid">
+        <div class="card"><h3>Voice & Style</h3>
+          <div class="dna-item"><span class="dl">Brand Voice</span><span class="dv">${gd.brand_voice||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Tone</span><span class="dv">${typeof tone==='object'?(tone.primary||'')+' / '+(tone.secondary||''):(gd.tone_primary||'N/A')}</span></div>
+          <div class="dna-item"><span class="dl">Language</span><span class="dv">${cp.language_style||gd.language_style||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Sentence Structure</span><span class="dv">${cp.sentence_structure||gd.sentence_structure||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Copy Length</span><span class="dv">${cp.avg_copy_length||gd.avg_copy_length||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Emoji</span><span class="dv">${(cp.uses_emoji||gd.uses_emoji)?'Yes - '+(cp.emoji_style||gd.emoji_style||''):'No'}</span></div>
+        </div>
+        <div class="card"><h3>Strategy</h3>
+          <div class="dna-item"><span class="dl">Hook Pattern</span><span class="dv">${hookPattern||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">CTA Strategy</span><span class="dv">${typeof cs==='object'?cs.cta_pattern||cs.primary_cta||'N/A':gd.cta_pattern||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Target Audience</span><span class="dv">${gd.target_audience_inferred||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">What Makes It Viral</span><span class="dv">${gd.what_makes_it_viral||'N/A'}</span></div>
+        </div>
+        <div class="card"><h3>Hook Examples</h3>${hookExamples.map(h=>'<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text)">"'+h+'"</div>').join('')}
+          ${typeof hs==='object'&&hs.hook_formula?'<div style="margin-top:8px;padding:8px;background:var(--s2);border-radius:6px;border-left:3px solid var(--accent);font-size:12px"><strong>Formula:</strong> '+hs.hook_formula+'</div>':''}</div>
+        <div class="card"><h3>Emotional Triggers</h3><div style="display:flex;gap:6px;flex-wrap:wrap">${(pp.emotional_triggers||gd.emotional_triggers||[]).map(t=>'<span class="tag t-cta">'+t+'</span>').join('')}</div>
+          ${pp.pain_points_targeted?'<div style="margin-top:10px;font-weight:600;font-size:12px;color:var(--pink)">Pain Points:</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+pp.pain_points_targeted.map(p=>'<span class="tag t-inactive">'+p+'</span>').join('')+'</div>':''}
+          ${pp.cognitive_biases?'<div style="margin-top:10px;font-weight:600;font-size:12px;color:var(--blue)">Cognitive Biases:</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">'+pp.cognitive_biases.map(b=>'<span class="tag t-aware">'+b+'</span>').join('')+'</div>':''}</div>
+        <div class="card"><h3>Power Words</h3><div style="display:flex;gap:6px;flex-wrap:wrap">${(cp.power_words||gd.power_words||[]).map(w=>'<span class="tag t-angle">'+w+'</span>').join('')}</div></div>
+        <div class="card"><h3>Unique Phrases</h3>${(cp.unique_phrases||gd.unique_phrases||[]).map(p=>'<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--a2)">"'+p+'"</div>').join('')}</div>
+      </div>`;
+  } else {
+    // Fallback to rule-based DNA
+    const te=Object.entries(rd.tone_scores||{}).sort((a,b)=>b[1]-a[1]);
+    const he=Object.entries(rd.hook_type_distribution||{}).sort((a,b)=>b[1]-a[1]);
+    c.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="dna-hl"><div class="big">${rd.copy_formula||'N/A'}</div><div class="desc">Copy Framework</div></div>
+        <div class="dna-hl"><div class="big">${rd.dominant_tone||'N/A'}</div><div class="desc">Dominant Tone</div></div>
+        <div class="dna-hl"><div class="big">${rd.dominant_hook_type||'N/A'}</div><div class="desc">Hook Style</div></div>
+      </div>
+      <div class="dna-grid">
+        <div class="card"><h3>Metrics</h3>
+          <div class="dna-item"><span class="dl">Avg Words/Ad</span><span class="dv">${rd.avg_copy_length_words}</span></div>
+          <div class="dna-item"><span class="dl">Avg Sentences</span><span class="dv">${rd.avg_sentences_per_ad}</span></div>
+          <div class="dna-item"><span class="dl">Emoji</span><span class="dv">${rd.uses_emoji?'Yes ('+rd.emoji_per_ad+'/ad)':'No'}</span></div>
+        </div>
+        <div class="card"><h3>Tone</h3><div class="bar-chart">${bars(te,Math.max(...te.map(e=>e[1]),1),'bf-purple')}</div></div>
+        <div class="card"><h3>Hook Types</h3><div class="bar-chart">${bars(he,rd.total_ads_analyzed||1,'bf-blue')}</div></div>
+      </div>`;
+  }
+}
+
+function renderCreative(){
+  const gc=D.gemini_creative_dna||{};const rc=D.creative_dna||{};
+  const c=document.getElementById('crC');
+
+  if(gc.creative_dna_summary){
+    c.innerHTML=`
+      <div class="dna-text">${gc.creative_dna_summary}</div>
+      <div class="dna-grid">
+        <div class="card"><h3>Visual Identity</h3><p style="font-size:13px;line-height:1.6;color:var(--dim)">${gc.visual_identity||'N/A'}</p></div>
+        <div class="card"><h3>Design System</h3>
+          <div class="dna-item"><span class="dl">Layout</span><span class="dv">${gc.dominant_layout||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Colors</span><span class="dv">${(typeof gc.color_strategy==='object'?(gc.color_strategy.primary_colors||[]):(gc.primary_colors||[])).join(', ')||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Color Strategy</span><span class="dv">${typeof gc.color_strategy==='object'?(gc.color_strategy.why_these_colors||gc.color_strategy.color_mood||'N/A'):s(gc.color_strategy)}</span></div>
+          <div class="dna-item"><span class="dl">Typography</span><span class="dv">${gc.typography_style||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Image Style</span><span class="dv">${gc.image_style||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Product Display</span><span class="dv">${gc.product_showcase||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Human Element</span><span class="dv">${gc.human_element||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Text Overlay</span><span class="dv">${gc.text_overlay_strategy||'N/A'}</span></div>
+          <div class="dna-item"><span class="dl">Mood</span><span class="dv">${gc.mood_consistency||'N/A'}</span></div>
+        </div>
+        ${gc.design_patterns?`<div class="card"><h3>Design Patterns</h3><div style="display:flex;gap:6px;flex-wrap:wrap">${(gc.design_patterns||[]).map(p=>'<span class="tag t-angle">'+p+'</span>').join('')}</div></div>`:''}
+        <div class="card"><h3>What Makes Creatives Work</h3><p style="font-size:13px;line-height:1.6;color:var(--dim)">${gc.what_makes_creatives_work||'N/A'}</p></div>
+      </div>`;
+  } else {
+    const me=Object.entries(rc.media_type_distribution||{});
+    const pe=Object.entries(rc.platform_distribution||{});
+    c.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+        <div class="dna-hl"><div class="big">${rc.avg_ad_duration_days} days</div><div class="desc">Avg Lifespan</div></div>
+        <div class="dna-hl"><div class="big">${rc.ab_testing_rate}%</div><div class="desc">A/B Testing</div></div>
+        <div class="dna-hl"><div class="big">${rc.total_images_extracted}</div><div class="desc">Images</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="card"><h3>Media</h3><div class="bar-chart">${bars(me,D.ads.length,'bf-orange')}</div></div>
+        <div class="card"><h3>Platforms</h3><div class="bar-chart">${bars(pe,D.ads.length,'bf-blue')}</div></div>
+      </div>`;
+  }
+}
+
+async function rewrite(){
+  const r=document.getElementById('rwR');
+  if(!jobId){r.innerHTML='<p style="color:var(--red)">No research loaded. Run a search first.</p>';return;}
+  r.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--dim)"><div class="spinner"></div>Gemini is generating clones... (takes 15-30 seconds)</div>';
+  try{
+  const res=await fetch('/api/rewrite',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:jobId,product_name:document.getElementById('rwP').value,product_desc:document.getElementById('rwD').value,target_audience:document.getElementById('rwA').value})});
+  const d=await res.json();
+  if(d.error){r.innerHTML='<p style="color:var(--red)">Error: '+d.error+'</p>';return;}
+
+  r.innerHTML=`<div style="margin-bottom:12px;font-size:12px;color:var(--dim)">Engine: <strong style="color:var(--accent)">${d.engine||'unknown'}</strong></div>`;
+  (d.rewrites||[]).forEach(rw=>{
+    if(rw.error){r.innerHTML+=`<div class="rw-card"><p style="color:var(--red)">${rw.error}</p></div>`;return;}
+    const ib=rw.image_brief||{};const pu=rw.psychology_used||{};
+    r.innerHTML+=`<div class="rw-card">
+      <div class="ver">${rw.version||''} ${rw.angle?'- '+rw.angle:''} ${rw.dna_match_score?'<span style="color:var(--green);margin-left:8px">DNA Match: '+rw.dna_match_score+'/10</span>':''}</div>
+      ${rw.hook?'<div style="font-size:13px;color:var(--green);margin-bottom:6px"><strong>Hook:</strong> '+rw.hook+'</div>':''}
+      ${rw.hook_type?'<span class="tag t-aware" style="margin-bottom:6px">'+rw.hook_type+'</span>':''}
+      ${rw.headline?'<div class="rw-headline">'+rw.headline+'</div>':''}
+      <div class="rw-text">${rw.primary_text||rw.text||''}</div>
+      <div class="rw-meta">
+        ${rw.cta?'<span class="tag t-cta">'+rw.cta+'</span>':''}
+        ${rw.angle?'<span class="tag t-angle">'+rw.angle+'</span>':''}
+        ${rw.description?'<span style="font-size:11px;color:var(--dim)">'+rw.description+'</span>':''}
+        <button class="copy-btn" onclick="cpRw(this)">Copy</button>
+      </div>
+      ${pu.emotional_triggers?'<div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">'+['Pain: '+(pu.pain_point||''),'Desire: '+(pu.desire||''),'Bias: '+(pu.cognitive_bias||'')].filter(x=>!x.endsWith(': ')).map(x=>'<span style="font-size:10px;color:var(--dim);background:var(--surface);padding:2px 8px;border-radius:10px">'+x+'</span>').join('')+'</div>':''}
+      ${typeof ib==='object'&&ib.what_to_show?'<div class="img-brief"><strong>Image Brief:</strong><br>'+ib.what_to_show+(ib.colors?'<br><strong>Colors:</strong> '+(ib.colors||[]).join(', '):'')+(ib.mood?'<br><strong>Mood:</strong> '+ib.mood:'')+(ib.text_overlay?'<br><strong>Text:</strong> '+ib.text_overlay:'')+(ib.reference_description?'<br><strong>Full Brief:</strong> '+ib.reference_description:'')+'</div>':(typeof ib==='string'&&ib?'<div class="img-brief"><strong>Image Brief:</strong> '+ib+'</div>':'')}
+      ${rw.angle_explanation?'<div class="why"><strong>Angle:</strong> '+rw.angle_explanation+'</div>':''}
+      ${rw.why_it_works?'<div class="why">'+rw.why_it_works+'</div>':''}
+    </div>`;
+  });
+  }catch(e){r.innerHTML='<p style="color:var(--red)">Error: '+e.message+'</p>';console.error('Rewrite error:',e);}
+}
+
+async function cloneAd(idx){
+  const m=document.getElementById('cloneModal');
+  const b=document.getElementById('cloneBody');
+  m.classList.add('open');
+  b.innerHTML='<div style="display:flex;align-items:center;gap:10px;color:var(--dim)"><div class="spinner"></div>Cloning with Gemini AI...</div>';
+
+  const pn=prompt('Your product name:','My Product');
+  const pd=prompt('Product description:','a premium product');
+  if(!pn){m.classList.remove('open');return;}
+
+  const res=await fetch('/api/clone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:jobId,ad_index:idx,product_name:pn,product_desc:pd})});
+  const d=await res.json();
+  if(d.error){b.innerHTML='<p style="color:var(--red)">'+d.error+'</p>';return;}
+
+  const cl=d.clone||{};const ib=cl.image_brief||{};
+  b.innerHTML=`
+    <div class="rw-card" style="background:var(--surface)">
+      <div class="ver">Cloned Ad</div>
+      <div class="rw-headline">${cl.cloned_headline||''}</div>
+      <div class="rw-text">${cl.cloned_primary_text||''}</div>
+      <div class="rw-meta">
+        <span class="tag t-cta">${cl.cta||''}</span>
+        ${cl.cloned_description?'<span style="font-size:11px;color:var(--dim)">'+cl.cloned_description+'</span>':''}
+        <button class="copy-btn" onclick="cpRw(this)">Copy</button>
+      </div>
+      ${typeof ib==='object'?`<div class="img-brief">
+        <strong>Image Brief:</strong><br>
+        Layout: ${ib.layout||'N/A'}<br>
+        Colors: ${(ib.colors||[]).join(', ')}<br>
+        Elements: ${(ib.elements||[]).join(', ')}<br>
+        Text Overlay: ${ib.text_overlay||'N/A'}<br>
+        Mood: ${ib.mood||'N/A'}<br>
+        <strong>Full Brief:</strong> ${ib.reference_description||'N/A'}
+      </div>`:`<div class="img-brief"><strong>Image Brief:</strong> ${ib}</div>`}
+      ${cl.what_was_cloned?'<div class="why">DNA Preserved: '+cl.what_was_cloned+'</div>':''}
+    </div>
+    <div class="card" style="margin-top:12px"><h3>Original Ad</h3>
+      <p style="font-size:13px;color:var(--dim)">${d.original?.primary_text||''}</p>
+    </div>`;
+}
+
+async function nicheTransform(){
+  const niche=document.getElementById('ntNiche').value;
+  const product=document.getElementById('ntProduct').value;
+  const desc=document.getElementById('ntDesc').value;
+  if(!niche){alert('Enter a target niche');return;}
+  const r=document.getElementById('ntR');
+  r.innerHTML='<div style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--dim)"><div class="spinner"></div>Transforming DNA into '+niche+'...</div>';
+  const res=await fetch('/api/niche-transform',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({job_id:jobId,target_niche:niche,product_name:product,product_desc:desc})});
+  const d=await res.json();
+  if(d.error){r.innerHTML='<p style="color:var(--red)">'+d.error+'</p>';return;}
+  r.innerHTML=`<h3 style="margin-bottom:12px;color:var(--pink)">${d.original_niche} → ${d.target_niche}</h3>`;
+  (d.transforms||[]).forEach(t=>{
+    r.innerHTML+=`<div class="rw-card">
+      <div class="ver">${t.version||''} - ${t.target_niche||niche}</div>
+      <div style="font-size:13px;color:var(--green);margin-bottom:6px"><strong>Hook:</strong> ${t.hook||''}</div>
+      <div class="rw-text">${t.primary_text||''}</div>
+      <div class="rw-headline">${t.headline||''}</div>
+      <div class="rw-meta">
+        <span class="tag t-cta">${t.cta||''}</span>
+        <button class="copy-btn" onclick="cpRw(this)">Copy</button>
+      </div>
+      ${t.image_brief?'<div class="img-brief"><strong>Image Brief:</strong> '+t.image_brief+'</div>':''}
+      ${t.dna_elements_preserved?'<div class="why"><strong>DNA Preserved:</strong> '+(t.dna_elements_preserved||[]).join(', ')+'</div>':''}
+      ${t.why_it_transfers?'<div class="why">'+t.why_it_transfers+'</div>':''}
+    </div>`;
+  });
+}
+
+function cpRw(btn){const t=btn.closest('.rw-card').querySelector('.rw-text').textContent;navigator.clipboard.writeText(t);btn.textContent='Copied!';setTimeout(()=>btn.textContent='Copy',1500);}
+function cf(a,f){const c={};a.forEach(x=>{const v=x[f]||'?';c[v]=(c[v]||0)+1});return Object.entries(c).sort((a,b)=>b[1]-a[1]);}
+function bars(e,t,c){return e.map(([l,v])=>{const p=Math.max(Math.round((v/t)*100),5);return`<div class="bar-row"><div class="bar-label">${l}</div><div class="bar-track"><div class="bar-fill ${c}" style="width:${p}%">${v}</div></div></div>`;}).join('');}
+function dl(t){if(D)window.open('/api/download/'+D[t==='json'?'json_file':'csv_file'],'_blank');}
+
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+</script>
+</body>
+</html>
