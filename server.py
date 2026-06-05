@@ -23,7 +23,36 @@ IMAGES_DIR = os.path.join(REPORTS_DIR, "images")
 os.makedirs(REPORTS_DIR, exist_ok=True)
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
+# Persistent history: research jobs survive server restarts (stored on disk).
+STORE_FILE = os.path.join(REPORTS_DIR, "_history.json")
+
+
+def load_history():
+    """Reload completed/failed jobs from disk into the in-memory store."""
+    try:
+        with open(STORE_FILE, "r", encoding="utf-8") as f:
+            saved = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return
+    research_store.update(saved)
+    for jid, entry in saved.items():
+        active_jobs[jid] = entry.get("status", "completed")
+    if saved:
+        print(f"  Loaded {len(saved)} saved job(s) from history")
+
+
+def save_history():
+    """Persist the current research store to disk."""
+    try:
+        with open(STORE_FILE, "w", encoding="utf-8") as f:
+            json.dump(research_store, f)
+    except OSError as e:
+        print(f"  Could not save history: {e}")
+
+
 HAS_GEMINI = bool(os.environ.get("GEMINI_API_KEY", ""))
+
+load_history()
 
 
 @app.route("/api/research", methods=["POST"])
@@ -79,11 +108,13 @@ def start_research():
                 "csv_file": f"{safe_name}_ads.csv",
             }
             active_jobs[job_id] = "completed"
+            save_history()
         except Exception as e:
             import traceback
             traceback.print_exc()
-            research_store[job_id] = {"status": "failed", "error": str(e)}
+            research_store[job_id] = {"status": "failed", "query": query, "error": str(e)}
             active_jobs[job_id] = "failed"
+            save_history()
         finally:
             loop.close()
 

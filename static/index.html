@@ -132,7 +132,10 @@
 <body>
 <div class="header">
   <div><h1>Viral Ad Cloner</h1><div class="sub">Extract DNA. Clone Winners. Powered by Gemini AI.</div></div>
-  <span class="gemini-badge" id="geminiBadge">Checking...</span>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn btn-secondary" onclick="openHistory()">History</button>
+    <span class="gemini-badge" id="geminiBadge">Checking...</span>
+  </div>
 </div>
 
 <div class="container">
@@ -149,11 +152,11 @@
 
   <div id="results" class="hidden">
     <div class="tabs" id="tabBar">
-      <div class="tab active" onclick="stab('overview')">Overview</div>
-      <div class="tab" onclick="stab('ads')">Ads & Creatives</div>
-      <div class="tab" onclick="stab('dna')">Copy DNA</div>
-      <div class="tab" onclick="stab('creative')">Creative DNA</div>
-      <div class="tab" onclick="stab('clone')">Clone & Rewrite</div>
+      <div class="tab active" data-tab="overview" onclick="stab('overview')">Overview</div>
+      <div class="tab" data-tab="ads" onclick="stab('ads')">Ads & Creatives</div>
+      <div class="tab" data-tab="dna" onclick="stab('dna')">Copy DNA</div>
+      <div class="tab" data-tab="creative" onclick="stab('creative')">Creative DNA</div>
+      <div class="tab" data-tab="clone" onclick="stab('clone')">Clone & Rewrite</div>
     </div>
 
     <div class="tab-content active" id="t-overview"><div id="statsG"></div><div class="charts-row" id="chartsR"></div>
@@ -197,6 +200,17 @@
   <div id="empty" class="empty"><h3>No Research Yet</h3><p>Enter a brand to extract their ad DNA.</p></div>
 </div>
 
+<!-- History modal -->
+<div class="modal-bg" id="historyModal">
+  <div class="modal"><h2>Research History</h2>
+    <p style="color:var(--dim);font-size:13px;margin-bottom:14px">Saved research jobs (persist across restarts). Click one to load it.</p>
+    <div id="historyBody">Loading...</div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-secondary" onclick="document.getElementById('historyModal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Clone modal -->
 <div class="modal-bg" id="cloneModal">
   <div class="modal"><h2>Clone This Ad</h2>
@@ -219,10 +233,39 @@ fetch('/api/status').then(r=>r.json()).then(d=>{
 
 function stab(n){
   document.querySelectorAll('.tab').forEach(t=>{
-    t.classList.toggle('active',t.textContent.toLowerCase().replace(/[& ]/g,'').includes(n.slice(0,4)));
+    t.classList.toggle('active',t.getAttribute('data-tab')===n);
   });
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.getElementById('t-'+n).classList.add('active');
+}
+
+async function openHistory(){
+  const m=document.getElementById('historyModal'),body=document.getElementById('historyBody');
+  m.classList.add('open');body.innerHTML='Loading...';
+  try{
+    const r=await fetch('/api/research');const jobs=await r.json();
+    const done=jobs.filter(j=>j.status==='completed');
+    if(!done.length){body.innerHTML='<p style="color:var(--dim)">No saved research yet. Run an Extract DNA search first.</p>';return;}
+    body.innerHTML=done.map(j=>`
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;cursor:pointer" onclick="loadJob('${j.job_id}')">
+        <div><div style="font-weight:600;color:var(--text)">${j.query||j.job_id}</div>
+          <div style="font-size:12px;color:var(--dim)">${j.ad_count||0} ads</div></div>
+        <span class="tag t-active">Load</span>
+      </div>`).join('');
+  }catch(e){body.innerHTML='<p style="color:var(--red)">Error loading history: '+e.message+'</p>';}
+}
+
+async function loadJob(id){
+  try{
+    const r=await fetch('/api/research/'+id);const d=await r.json();
+    if(d.status!=='completed'){alert('Job not available: '+(d.error||d.status));return;}
+    jobId=id;D=d;
+    document.getElementById('historyModal').classList.remove('open');
+    document.getElementById('empty').classList.add('hidden');
+    document.getElementById('sbar').classList.remove('visible');
+    renderAll();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){alert('Error loading job: '+e.message);}
 }
 
 async function go(){
