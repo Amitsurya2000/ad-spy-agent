@@ -13,5 +13,25 @@ services:
       # Persist research history + downloaded images across redeploys.
       - adspy_reports:/app/reports
 
+  # Reverse proxy with automatic HTTPS (Let's Encrypt). Only runs when
+  # SITE_ADDRESS is set in .env (e.g. SITE_ADDRESS=adspyagent.duckdns.org).
+  caddy:
+    image: caddy:2
+    container_name: adspy-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SITE_ADDRESS=${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - adspy
+
 volumes:
   adspy_reports:
+  caddy_data:
+  caddy_config:

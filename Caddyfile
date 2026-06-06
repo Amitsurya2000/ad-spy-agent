@@ -1,0 +1,5 @@
+# Caddy auto-HTTPS reverse proxy.
+# SITE_ADDRESS (e.g. adspyagent.duckdns.org) is read from the .env file.
+{$SITE_ADDRESS} {
+    reverse_proxy adspy:4000
+}
