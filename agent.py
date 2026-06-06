@@ -22,10 +22,12 @@ class AdSpyAgent:
 
     AD_LIBRARY_URL = "https://www.facebook.com/ads/library/"
 
-    def __init__(self, headless=False, max_ads=30, scroll_rounds=5, images_dir=None):
+    def __init__(self, headless=False, max_ads=30, scroll_rounds=5, images_dir=None, slow_mo=None):
         self.headless = headless
         self.max_ads = max_ads
         self.scroll_rounds = scroll_rounds
+        # When showing the browser, slow each action down so it is visible.
+        self.slow_mo = slow_mo if slow_mo is not None else (0 if headless else 400)
         self.images_dir = images_dir or os.path.join(os.path.dirname(__file__), "..", "reports", "images")
         self.browser = None
         self.context = None
@@ -41,9 +43,15 @@ class AdSpyAgent:
 
     async def launch(self):
         self._pw = await async_playwright().start()
+        # --no-sandbox / --disable-dev-shm-usage are required to run Chromium
+        # inside a Docker container (root user, small /dev/shm).
+        launch_args = ["--no-sandbox", "--disable-dev-shm-usage"]
+        if not self.headless:
+            launch_args.append("--start-maximized")
         self.browser = await self._pw.chromium.launch(
             headless=self.headless,
-            args=["--start-maximized"],
+            slow_mo=self.slow_mo,
+            args=launch_args,
         )
         self.context = await self.browser.new_context(
             viewport={"width": 1440, "height": 900},
@@ -66,14 +74,27 @@ class AdSpyAgent:
     # ------------------------------------------------------------------
 
     async def navigate_to_ad_library(self, query: str, country: str = "ALL"):
-        url = (
+        # Open the Ad Library for the chosen country WITHOUT a query, so the
+        # search box is on screen and we can visibly type into it.
+        base = (
             f"{self.AD_LIBRARY_URL}"
             f"?active_status=all&ad_type=all&country={country}"
-            f"&q={query}&search_type=keyword_unordered&media_type=all"
+            f"&search_type=keyword_unordered&media_type=all"
         )
-        await self.page.goto(url, wait_until="domcontentloaded", timeout=60000)
-        await asyncio.sleep(5)
+        await self.page.goto(base, wait_until="domcontentloaded", timeout=60000)
+        await asyncio.sleep(4)
+        await self._dismiss_cookies()
 
+        typed = await self._type_search(query)
+        if not typed:
+            # Fallback: load the full URL with the query baked in (reliable).
+            print("       (search box not found - using direct URL)")
+            await self.page.goto(base + f"&q={query}", wait_until="domcontentloaded", timeout=60000)
+            await asyncio.sleep(4)
+            await self._dismiss_cookies()
+        await asyncio.sleep(3)
+
+    async def _dismiss_cookies(self):
         try:
             cookie_btn = self.page.locator(
                 'button:has-text("Allow all cookies"), '
@@ -83,10 +104,45 @@ class AdSpyAgent:
             )
             if await cookie_btn.count() > 0:
                 await cookie_btn.first.click()
-                await asyncio.sleep(2)
+                await asyncio.sleep(1.5)
         except Exception:
             pass
-        await asyncio.sleep(3)
+
+    async def _type_search(self, query: str) -> bool:
+        """Visibly type the keyword into the Ad Library search box. Returns True on success."""
+        selectors = [
+            'input[placeholder*="keyword" i]',
+            'input[placeholder*="advertiser" i]',
+            'input[placeholder*="Search" i]',
+            'input[type="search"]',
+            'input[aria-label*="Search" i]',
+            'input[role="combobox"]',
+        ]
+        box = None
+        for sel in selectors:
+            try:
+                loc = self.page.locator(sel).first
+                if await loc.count() > 0 and await loc.is_visible():
+                    box = loc
+                    break
+            except Exception:
+                continue
+        if box is None:
+            return False
+        try:
+            await box.scroll_into_view_if_needed()
+            await box.click()
+            await asyncio.sleep(0.5)
+            await box.fill("")
+            # Type character-by-character so the keystrokes are visible.
+            await box.press_sequentially(query, delay=140)
+            await asyncio.sleep(1)
+            await self.page.keyboard.press("Enter")
+            await asyncio.sleep(5)  # let results load
+            return True
+        except Exception as e:
+            print(f"       (typing failed: {e})")
+            return False
 
     # ------------------------------------------------------------------
     # Identify brand
@@ -119,10 +175,14 @@ class AdSpyAgent:
 
     async def scroll_and_collect(self):
         for i in range(self.scroll_rounds):
-            await self.page.evaluate("window.scrollBy(0, window.innerHeight)")
-            await asyncio.sleep(2)
-        await self.page.evaluate("window.scrollTo(0, 0)")
-        await asyncio.sleep(1)
+            # Smooth, visible scroll: several small mouse-wheel steps per round.
+            for _ in range(6):
+                await self.page.mouse.wheel(0, 600)
+                await asyncio.sleep(0.4)
+            await asyncio.sleep(1.5)  # pause for new ads to lazy-load
+        # Scroll back to top so image extraction starts from the beginning.
+        await self.page.evaluate("window.scrollTo({top: 0, behavior: 'smooth'})")
+        await asyncio.sleep(1.5)
 
         full_text = await self.page.inner_text("body")
         return full_text

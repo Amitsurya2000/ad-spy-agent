@@ -52,6 +52,10 @@ def save_history():
 
 HAS_GEMINI = bool(os.environ.get("GEMINI_API_KEY", ""))
 
+# On a server (no display) the browser MUST run headless. Locally it defaults
+# to a visible window so you can watch the automation. Override with HEADLESS=true.
+HEADLESS = os.environ.get("HEADLESS", "false").lower() in ("1", "true", "yes")
+
 load_history()
 
 
@@ -78,7 +82,7 @@ def start_research():
         asyncio.set_event_loop(loop)
         try:
             agent = AdSpyAgent(
-                headless=False,
+                headless=HEADLESS,
                 max_ads=max_ads,
                 scroll_rounds=scroll_rounds,
                 images_dir=IMAGES_DIR,

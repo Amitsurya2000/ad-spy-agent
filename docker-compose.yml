@@ -1,0 +1,17 @@
+services:
+  adspy:
+    build: .
+    container_name: ad-spy-agent
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # Set your Gemini key here or in Dokploy's env/secrets (do NOT commit it).
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - HEADLESS=true
+    volumes:
+      # Persist research history + downloaded images across redeploys.
+      - adspy_reports:/app/reports
+
+volumes:
+  adspy_reports:
