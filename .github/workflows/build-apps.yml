@@ -1,0 +1,53 @@
+name: Build apps (all platforms)
+
+on:
+  push:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/build-apps.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: mac
+            args: --mac --x64 --arm64
+          - os: windows-latest
+            name: windows
+            args: --win --x64 --arm64
+          - os: ubuntu-latest
+            name: linux-x64
+            args: --linux --x64
+          - os: ubuntu-latest
+            name: linux-arm64
+            args: --linux --arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install rpm tooling (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm install
+      - name: Build
+        working-directory: desktop
+        run: npx electron-builder ${{ matrix.args }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdSpyAgent-${{ matrix.name }}
+          path: |
+            desktop/dist/*.dmg
+            desktop/dist/*.exe
+            desktop/dist/*.msi
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.rpm
+          if-no-files-found: ignore

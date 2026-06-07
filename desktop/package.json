@@ -1,0 +1,33 @@
+{
+  "name": "ad-spy-agent",
+  "productName": "Ad Spy Agent",
+  "version": "1.0.0",
+  "description": "Ad Spy Agent - desktop app",
+  "author": "Ad Spy Agent",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.adspyagent.app",
+    "productName": "Ad Spy Agent",
+    "directories": { "output": "dist" },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.business"
+    },
+    "win": {
+      "target": ["nsis", "msi"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb", "rpm"],
+      "category": "Office",
+      "maintainer": "adspyagent"
+    }
+  }
+}

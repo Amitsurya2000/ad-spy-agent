@@ -4,3 +4,7 @@ __pycache__/
 reports/
 .env
 .gemini_key
+
+desktop/node_modules/
+desktop/dist/
+desktop/buildenv/
