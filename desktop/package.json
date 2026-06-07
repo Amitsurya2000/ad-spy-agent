@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Ad Spy Agent - desktop app",
   "author": "Ad Spy Agent",
+  "homepage": "https://adspyagent.duckdns.org",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
