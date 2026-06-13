@@ -3,35 +3,23 @@ services:
     build: .
     container_name: ad-spy-agent
     restart: unless-stopped
-    ports:
-      - "4000:4000"
     environment:
-      # Set your Gemini key here or in Dokploy's env/secrets (do NOT commit it).
+      # Set in the server-side .env file (never commit the key).
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - HEADLESS=true
     volumes:
       # Persist research history + downloaded images across redeploys.
       - adspy_reports:/app/reports
+    # Joins the shared "web" network so the host's single Caddy reverse proxy
+    # (running in the intelligentspeech stack) can route to it by name: adspy:4000.
+    # This app no longer ships its own Caddy and publishes no host ports — many
+    # apps share one server behind one proxy. See SHARED-SERVER.md.
+    networks:
+      - web
 
-  # Reverse proxy with automatic HTTPS (Let's Encrypt). Only runs when
-  # SITE_ADDRESS is set in .env (e.g. SITE_ADDRESS=adspyagent.duckdns.org).
-  caddy:
-    image: caddy:2
-    container_name: adspy-caddy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      - SITE_ADDRESS=${SITE_ADDRESS}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - adspy
+networks:
+  web:
+    external: true
 
 volumes:
   adspy_reports:
-  caddy_data:
-  caddy_config:
