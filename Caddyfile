@@ -1,5 +1,12 @@
-# Caddy auto-HTTPS reverse proxy.
-# SITE_ADDRESS (e.g. adspyagent.duckdns.org) is read from the .env file.
-{$SITE_ADDRESS} {
-    reverse_proxy adspy:4000
+{$DOMAIN} {
+	# Ad screenshots the worker writes to the shared ad_images volume -
+	# served straight off disk, no round-trip through Next.js.
+	handle_path /images/* {
+		root * /srv/ad-images
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
 }

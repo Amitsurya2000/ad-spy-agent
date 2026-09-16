@@ -1,5 +1,5 @@
 """Local launcher: registers this hyphenated folder as the importable
-package `ad_spy_agent` so the relative imports work, then starts the server."""
+package `ad_spy_agent` so the relative imports work, then starts the worker."""
 import importlib.util
 import os
 import sys
@@ -15,6 +15,6 @@ module = importlib.util.module_from_spec(spec)
 sys.modules["ad_spy_agent"] = module
 spec.loader.exec_module(module)
 
-from ad_spy_agent.server import run_server
+from ad_spy_agent.worker import main_loop
 
-run_server(int(os.environ.get("PORT", "4000")))
+main_loop()

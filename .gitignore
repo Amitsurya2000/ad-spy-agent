@@ -3,8 +3,12 @@ __pycache__/
 *.pyc
 reports/
 .env
-.gemini_key
 
 desktop/node_modules/
 desktop/dist/
 desktop/buildenv/
+
+# web/ (Next.js)
+web/node_modules/
+web/.next/
+web/.env*.local

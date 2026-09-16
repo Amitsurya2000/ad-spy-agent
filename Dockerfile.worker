@@ -1,0 +1,24 @@
+# Ad Spy Agent - worker image (Chromium scraper + Postgres + Gemini)
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HEADLESS=true \
+    IMAGES_DIR=/data/ad-images
+
+WORKDIR /app
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Chromium + all OS libraries patchright needs (runs apt under the hood).
+RUN patchright install --with-deps chromium
+
+# Copy the app in as an importable package named `ad_spy_agent` (the repo
+# folder name has a hyphen, which isn't a valid module name) - worker.py and
+# start_worker.py rely on this same layout as the local dev setup.
+COPY . /app/ad_spy_agent/
+
+WORKDIR /app/ad_spy_agent
+
+CMD ["python", "start_worker.py"]

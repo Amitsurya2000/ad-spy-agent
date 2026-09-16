@@ -1,25 +1,67 @@
 services:
-  adspy:
-    build: .
-    container_name: ad-spy-agent
+  postgres:
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      # Set in the server-side .env file (never commit the key).
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - HEADLESS=true
+      POSTGRES_DB: adspy
+      POSTGRES_USER: adspy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      # Persist research history + downloaded images across redeploys.
-      - adspy_reports:/app/reports
-    # Joins the shared "web" network so the host's single Caddy reverse proxy
-    # (running in the intelligentspeech stack) can route to it by name: adspy:4000.
-    # This app no longer ships its own Caddy and publishes no host ports — many
-    # apps share one server behind one proxy. See SHARED-SERVER.md.
-    networks:
+      - postgres_data:/var/lib/postgresql/data
+      # Only runs once, against an empty data directory (first boot). To
+      # change the schema later, apply db/schema.sql by hand instead.
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adspy -d adspy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://adspy:${POSTGRES_PASSWORD}@postgres:5432/adspy
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      HEADLESS: "true"
+    volumes:
+      - ad_images:/data/ad-images
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://adspy:${POSTGRES_PASSWORD}@postgres:5432/adspy
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ad_images:/srv/ad-images:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
       - web
 
-networks:
-  web:
-    external: true
-
 volumes:
-  adspy_reports:
+  postgres_data:
+  ad_images:
+  caddy_data:
+  caddy_config:
