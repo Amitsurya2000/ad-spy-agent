@@ -19,8 +19,80 @@
   }
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light dark;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+  /* Never let one stray long string create a horizontal scrollbar. */
+  overflow-x: clip;
+  overflow-wrap: break-word;
+}
+
+@layer components {
+  /* Page shell: responsive gutters that also respect notches / home bars. */
+  .page {
+    @apply mx-auto w-full flex-1 py-6 sm:py-10;
+    padding-inline-start: max(1rem, env(safe-area-inset-left));
+    padding-inline-end: max(1rem, env(safe-area-inset-right));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+  @media (min-width: 40rem) {
+    .page {
+      padding-inline-start: max(1.5rem, env(safe-area-inset-left));
+      padding-inline-end: max(1.5rem, env(safe-area-inset-right));
+    }
+  }
+
+  .card {
+    @apply min-w-0 rounded-lg border border-neutral-200 dark:border-neutral-800;
+  }
+
+  .field-label {
+    @apply text-xs font-medium text-neutral-600 dark:text-neutral-400;
+  }
+
+  /* 16px on touch devices stops iOS Safari zooming the page on focus;
+     44px min height meets the recommended touch-target size. */
+  .field-input {
+    @apply min-h-11 w-full min-w-0 rounded border border-neutral-300 bg-transparent px-3 py-2 text-base pointer-fine:min-h-9 md:text-sm dark:border-neutral-700 dark:bg-neutral-900;
+  }
+
+  .chip {
+    @apply max-w-full rounded bg-neutral-100 px-2 py-0.5 break-words dark:bg-neutral-800;
+  }
+
+  .msg-error {
+    @apply text-sm break-words text-red-600 dark:text-red-400;
+  }
+}
+
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center rounded px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 pointer-fine:min-h-9;
+}
+@utility btn-primary {
+  @apply btn bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200;
+}
+@utility btn-secondary {
+  @apply btn border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900;
+}
+
+/* Visible keyboard focus everywhere. */
+:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

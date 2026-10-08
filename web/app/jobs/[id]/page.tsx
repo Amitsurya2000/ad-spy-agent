@@ -4,13 +4,7 @@ import { useEffect, useState, FormEvent } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { Ad, Json, ResearchJob } from "@/lib/types";
-
-const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  running: "bg-blue-100 text-blue-800",
-  completed: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
-};
+import { StatusBadge } from "../../status-badge";
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +12,7 @@ export default function JobDetailPage() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Single self-terminating poll: keeps refetching every 3s while the job is
   // still pending/running, and stops on its own once it reaches a terminal
@@ -27,20 +22,32 @@ export default function JobDetailPage() {
     let timer: ReturnType<typeof setTimeout>;
 
     async function load() {
-      const res = await fetch(`/api/research/${id}`);
-      if (stopped) return;
-      if (res.status === 404) {
-        setNotFound(true);
+      try {
+        const res = await fetch(`/api/research/${id}`);
+        if (stopped) return;
+        if (res.status === 404) {
+          setNotFound(true);
+          setLoading(false);
+          return;
+        }
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        const data = await res.json();
+        if (stopped) return;
+        setJob(data.job);
+        setAds(data.ads);
+        setLoadError(null);
         setLoading(false);
-        return;
-      }
-      const data = await res.json();
-      setJob(data.job);
-      setAds(data.ads);
-      setLoading(false);
 
-      if (data.job.status === "pending" || data.job.status === "running") {
-        timer = setTimeout(load, 3000);
+        if (data.job.status === "pending" || data.job.status === "running") {
+          timer = setTimeout(load, 3000);
+        }
+      } catch (e) {
+        if (stopped) return;
+        // Keep any already-loaded data on screen and retry, rather than
+        // leaving the page stuck on "Loading..." forever.
+        setLoadError(e instanceof Error ? e.message : "Couldn't load this job.");
+        setLoading(false);
+        timer = setTimeout(load, 5000);
       }
     }
 
@@ -52,32 +59,45 @@ export default function JobDetailPage() {
   }, [id]);
 
   if (loading) {
-    return <main className="mx-auto max-w-5xl px-4 py-10 text-sm text-neutral-500">Loading...</main>;
+    return <main className="page max-w-5xl text-sm text-neutral-600 dark:text-neutral-400">Loading...</main>;
   }
   if (notFound || !job) {
-    return <main className="mx-auto max-w-5xl px-4 py-10 text-sm text-red-600">Job not found.</main>;
+    return (
+      <main className="page max-w-5xl">
+        <Link href="/" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:underline dark:text-neutral-400">
+          &larr; Back
+        </Link>
+        <p role="alert" className="msg-error mt-2">
+          {notFound ? "Job not found." : (loadError ?? "Couldn't load this job.")}
+        </p>
+      </main>
+    );
   }
 
   const dnaSummary =
     job.gemini_copy_dna?.dna_summary ?? job.copy_dna?.dna_summary ?? null;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10">
-      <Link href="/" className="text-sm text-neutral-500 hover:underline">
+    <main className="page max-w-5xl">
+      <Link href="/" className="inline-flex min-h-11 items-center text-sm text-neutral-600 hover:underline dark:text-neutral-400">
         &larr; Back
       </Link>
 
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{job.query}</h1>
-          <p className="text-sm text-neutral-500">
+      {loadError && (
+        <p role="alert" className="msg-error mb-2">
+          Connection problem - retrying... ({loadError})
+        </p>
+      )}
+
+      <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-semibold break-words sm:text-2xl">{job.query}</h1>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
             {job.country} - {job.brand_info?.matched_brand ?? "..."} -{" "}
             {ads.length} ads scraped
           </p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-medium ${STATUS_STYLES[job.status]}`}>
-          {job.status}
-        </span>
+        <StatusBadge status={job.status} />
       </div>
 
       {(job.status === "pending" || job.status === "running") && (
@@ -89,22 +109,22 @@ export default function JobDetailPage() {
       )}
 
       {job.status === "failed" && (
-        <p className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+        <p className="mt-6 rounded-lg border border-red-200 bg-red-50 p-4 text-sm break-words text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
           Failed: {job.error}
         </p>
       )}
 
       {job.status === "completed" && (
         <>
-          <div className="mt-4 flex gap-3 text-sm">
+          <div className="mt-4 flex flex-wrap gap-3">
             <a
-              className="rounded border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="btn-secondary"
               href={`/api/download/${job.id}?format=json`}
             >
               Download JSON
             </a>
             <a
-              className="rounded border border-neutral-300 px-3 py-1.5 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+              className="btn-secondary"
               href={`/api/download/${job.id}?format=csv`}
             >
               Download CSV
@@ -112,19 +132,19 @@ export default function JobDetailPage() {
           </div>
 
           {dnaSummary && (
-            <div className="mt-6 rounded-lg border border-neutral-200 p-4 text-sm dark:border-neutral-800">
+            <div className="card mt-6 p-4 text-sm">
               <h2 className="font-medium">Copy DNA summary</h2>
-              <p className="mt-1 text-neutral-600 dark:text-neutral-400">{dnaSummary}</p>
+              <p className="mt-1 break-words text-neutral-600 dark:text-neutral-400">{dnaSummary}</p>
             </div>
           )}
 
           <RewritePanel jobId={job.id} />
           <NicheTransformPanel jobId={job.id} />
 
-          <h2 className="mt-10 text-sm font-medium text-neutral-500">
+          <h2 className="mt-8 text-sm font-medium text-neutral-600 sm:mt-10 dark:text-neutral-400">
             Ads ({ads.length})
           </h2>
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {ads.map((ad) => (
               <AdCard key={ad.id} ad={ad} />
             ))}
@@ -165,31 +185,34 @@ function AdCard({ ad }: { ad: Ad }) {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 p-4 text-sm dark:border-neutral-800">
+    <div className="card flex flex-col p-4 text-sm">
       {ad.image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={ad.image_url}
           alt={ad.headline || "Ad creative"}
-          className="mb-3 max-h-64 w-full rounded object-cover"
+          loading="lazy"
+          className="mb-3 max-h-64 w-full rounded bg-neutral-100 object-cover dark:bg-neutral-800"
         />
       )}
-      <div className="flex flex-wrap gap-1 text-xs text-neutral-500">
-        {ad.platform && <span className="rounded bg-neutral-100 px-2 py-0.5 dark:bg-neutral-800">{ad.platform}</span>}
-        {ad.angle && <span className="rounded bg-neutral-100 px-2 py-0.5 dark:bg-neutral-800">{ad.angle}</span>}
-        {ad.funnel_stage && <span className="rounded bg-neutral-100 px-2 py-0.5 dark:bg-neutral-800">{ad.funnel_stage}</span>}
+      <div className="flex flex-wrap gap-1 text-xs text-neutral-600 dark:text-neutral-400">
+        {ad.platform && <span className="chip">{ad.platform}</span>}
+        {ad.angle && <span className="chip">{ad.angle}</span>}
+        {ad.funnel_stage && <span className="chip">{ad.funnel_stage}</span>}
       </div>
-      {ad.headline && <p className="mt-2 font-medium">{ad.headline}</p>}
+      {ad.headline && <p className="mt-2 font-medium break-words">{ad.headline}</p>}
       {ad.primary_text && (
-        <p className="mt-1 whitespace-pre-line text-neutral-600 dark:text-neutral-400">
+        <p className="mt-1 whitespace-pre-line break-words text-neutral-600 dark:text-neutral-400">
           {ad.primary_text.length > 240 ? ad.primary_text.slice(0, 240) + "..." : ad.primary_text}
         </p>
       )}
-      {ad.cta && <p className="mt-2 text-xs text-neutral-500">CTA: {ad.cta}</p>}
+      {ad.cta && <p className="mt-2 text-xs break-words text-neutral-600 dark:text-neutral-400">CTA: {ad.cta}</p>}
 
       <button
+        type="button"
         onClick={() => setCloning((v) => !v)}
-        className="mt-3 rounded border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+        aria-expanded={cloning}
+        className="btn-secondary mt-3 self-start"
       >
         {cloning ? "Cancel" : "Clone this ad"}
       </button>
@@ -197,13 +220,15 @@ function AdCard({ ad }: { ad: Ad }) {
       {cloning && (
         <form onSubmit={handleClone} className="mt-3 flex flex-col gap-2">
           <input
-            className="rounded border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+            className="field-input"
+            aria-label="Your product name"
             placeholder="Your product name"
             value={productName}
             onChange={(e) => setProductName(e.target.value)}
           />
           <input
-            className="rounded border border-neutral-300 px-2 py-1.5 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+            className="field-input"
+            aria-label="Your product description"
             placeholder="Your product description"
             value={productDesc}
             onChange={(e) => setProductDesc(e.target.value)}
@@ -211,22 +236,22 @@ function AdCard({ ad }: { ad: Ad }) {
           <button
             type="submit"
             disabled={loading}
-            className="self-start rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+            className="btn-primary self-start"
           >
             {loading ? "Cloning..." : "Generate clone"}
           </button>
         </form>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+      {error && <p role="alert" className="msg-error mt-2">{error}</p>}
 
       {result?.cloned_ad && (
-        <div className="mt-3 rounded border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="mt-3 rounded border border-neutral-200 bg-neutral-50 p-3 text-xs break-words dark:border-neutral-800 dark:bg-neutral-900">
           <p className="font-medium">{result.cloned_ad.headline}</p>
           <p className="mt-1 whitespace-pre-line text-neutral-600 dark:text-neutral-400">
             {result.cloned_ad.primary_text}
           </p>
-          <p className="mt-1 text-neutral-500">CTA: {result.cloned_ad.cta}</p>
+          <p className="mt-1 text-neutral-600 dark:text-neutral-400">CTA: {result.cloned_ad.cta}</p>
         </div>
       )}
     </div>
@@ -269,30 +294,35 @@ function RewritePanel({ jobId }: { jobId: string }) {
   }
 
   return (
-    <div className="mt-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+    <div className="card mt-6 p-4">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="text-sm font-medium"
+        aria-expanded={open}
+        className="min-h-11 w-full text-left text-sm font-medium pointer-fine:min-h-0"
       >
         {open ? "−" : "+"} Generate rewrites for my product
       </button>
       {open && (
         <>
-          <form onSubmit={handleSubmit} className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+          <form onSubmit={handleSubmit} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Product name"
               placeholder="Product name"
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
             />
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Product description"
               placeholder="Product description"
               value={productDesc}
               onChange={(e) => setProductDesc(e.target.value)}
             />
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Target audience"
               placeholder="Target audience"
               value={targetAudience}
               onChange={(e) => setTargetAudience(e.target.value)}
@@ -300,20 +330,20 @@ function RewritePanel({ jobId }: { jobId: string }) {
             <button
               type="submit"
               disabled={loading}
-              className="col-span-full self-start rounded bg-neutral-900 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+              className="btn-primary col-span-full self-start"
             >
               {loading ? "Generating..." : "Generate 6 rewrites"}
             </button>
           </form>
-          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          {error && <p role="alert" className="msg-error mt-2">{error}</p>}
           {rewrites && (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {rewrites.map((r, i) => (
-                <div key={i} className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
+                <div key={i} className="min-w-0 rounded border border-neutral-200 p-3 text-xs break-words dark:border-neutral-800">
                   <p className="font-medium">{r.version} - {r.angle}</p>
                   <p className="mt-1 font-medium">{r.headline}</p>
                   <p className="mt-1 whitespace-pre-line text-neutral-600 dark:text-neutral-400">{r.primary_text}</p>
-                  <p className="mt-1 text-neutral-500">CTA: {r.cta}</p>
+                  <p className="mt-1 text-neutral-600 dark:text-neutral-400">CTA: {r.cta}</p>
                 </div>
               ))}
             </div>
@@ -360,27 +390,35 @@ function NicheTransformPanel({ jobId }: { jobId: string }) {
   }
 
   return (
-    <div className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <button onClick={() => setOpen((v) => !v)} className="text-sm font-medium">
+    <div className="card mt-4 p-4">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="min-h-11 w-full text-left text-sm font-medium pointer-fine:min-h-0"
+      >
         {open ? "−" : "+"} Transform this DNA into a different niche
       </button>
       {open && (
         <>
-          <form onSubmit={handleSubmit} className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+          <form onSubmit={handleSubmit} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Target niche (e.g. Real Estate)"
               placeholder="Target niche (e.g. Real Estate)"
               value={targetNiche}
               onChange={(e) => setTargetNiche(e.target.value)}
             />
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Product name"
               placeholder="Product name"
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
             />
             <input
-              className="rounded border border-neutral-300 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900"
+              className="field-input"
+              aria-label="Product description"
               placeholder="Product description"
               value={productDesc}
               onChange={(e) => setProductDesc(e.target.value)}
@@ -388,19 +426,19 @@ function NicheTransformPanel({ jobId }: { jobId: string }) {
             <button
               type="submit"
               disabled={loading}
-              className="col-span-full self-start rounded bg-neutral-900 px-4 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+              className="btn-primary col-span-full self-start"
             >
               {loading ? "Transforming..." : "Generate 3 transforms"}
             </button>
           </form>
-          {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+          {error && <p role="alert" className="msg-error mt-2">{error}</p>}
           {transforms && (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               {transforms.map((t, i) => (
-                <div key={i} className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
+                <div key={i} className="min-w-0 rounded border border-neutral-200 p-3 text-xs break-words dark:border-neutral-800">
                   <p className="font-medium">{t.headline}</p>
                   <p className="mt-1 whitespace-pre-line text-neutral-600 dark:text-neutral-400">{t.primary_text}</p>
-                  <p className="mt-1 text-neutral-500">CTA: {t.cta}</p>
+                  <p className="mt-1 text-neutral-600 dark:text-neutral-400">CTA: {t.cta}</p>
                 </div>
               ))}
             </div>
